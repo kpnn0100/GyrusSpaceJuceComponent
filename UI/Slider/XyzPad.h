@@ -72,9 +72,9 @@ namespace Gui
 		float mValue[3] = {0.0f,0.0f,0.0f};
 		float minValue[3] = {-1.0f, -1.0f, -1.0f};
 		float maxValue[3] = { 1.0f, 1.0f, 1.0f };
-		float mDimension[3] = {200,200,200};
+		float mDimension[3];
 		float zRatio = (1 / sqrt(2)) / (1 / sqrt(2) + 2);
-		float boxDimension[3];
+		float mBoxDimension[3];
 		float mThickness = 4;
 		Colour mBackgroundColor = Colour(22, 22, 23); 
 		Colour mBorderColor = Colour(50, 50, 50);
@@ -101,6 +101,7 @@ namespace Gui
 		std::mutex mutex;
 	public:
 		XyzPad();
+		void setBoxSize(float sizeX, float sizeY, float sizeZ);
 		void registerSlider(Slider* slider, int axis);
 		void deregisterSlider(Slider* slider);
 		float getValue(int dimension);

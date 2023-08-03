@@ -8,7 +8,14 @@ namespace Gui
 	//XyzPad
 	XyzPad::XyzPad()
 	{
-
+		setBoxSize(100, 100, 100);
+	}
+	void XyzPad::setBoxSize(float sizeX, float sizeY, float sizeZ)
+	{
+		mBoxDimension[0] = sizeX;
+		mBoxDimension[1] = sizeY;
+		mBoxDimension[2] = sizeZ;
+		updateView();
 	}
 	void XyzPad::registerSlider(Slider* slider, int axis)
 	{
@@ -26,16 +33,7 @@ namespace Gui
 			sliderList[i].erase(std::remove(sliderList[i].begin(), sliderList[i].end(), slider), sliderList[i].end());
 		}
 	}
-	void XyzPad::updateView()
-	{
-		boxDimension[0] = (1 - zRatio) * getWidth();
-		boxDimension[1] = (1 - zRatio) * getHeight();
-		boxDimension[2] = zRatio * getHeight();
-		thumb.setSize(thumbWidth,thumbWidth);
-		Point<int> newThumbPosition = valueToCoordinate(mValue[0], mValue[1], mValue[2]) - Point<int>(thumbWidth / 2, thumbWidth / 2);
-		thumb.setTopLeftPosition(newThumbPosition);
-		repaint();
-	}
+
 	float XyzPad::getValue(int dimension)
 	{
 		return mValue[dimension];
@@ -93,13 +91,15 @@ namespace Gui
 	Point<int> XyzPad::valueToCoordinate(float x, float y, float z)
 	{
 
-		auto xyBound = Rectangle<float>(0, getYfromBottom(boxDimension[1]), boxDimension[0], boxDimension[1]);
-		float zToX = boxDimension[2]*
+		auto xyBound = Rectangle<float>(
+			(getWidth() - (mDimension[0] + mDimension[2])) / 2,
+			(getHeight() - (mDimension[1] + mDimension[2])) / 2 + mDimension[2], mDimension[0], mDimension[1]);
+		float zToX = mDimension[2]*
 			(z - minValue[2]) / (maxValue[2] - minValue[2]);
-		float zToY = boxDimension[2] *
+		float zToY = mDimension[2] *
 			(z - minValue[2]) / (maxValue[2] - minValue[2]);
 		float coordinateX = zToX +  xyBound.getX() + (x - minValue[0]) / (maxValue[0] - minValue[0])* (xyBound.getTopRight().getX() - xyBound.getX());
-		float coordinateY = jmap(y,minValue[1],maxValue[1], xyBound.getBottom(), xyBound.getBottom()-boxDimension[1]) - zToY;
+		float coordinateY = jmap(y,minValue[1],maxValue[1], xyBound.getBottom(), xyBound.getBottom()-mDimension[1]) - zToY;
 		return Point<int>((int)coordinateX,(int)coordinateY);
 	}
 
@@ -114,14 +114,14 @@ namespace Gui
 		Point<float> travelVector = newPosition - mDragPositionStart;
 		if (ModifierKeys::getCurrentModifiers().isShiftDown())
 		{
-			mValue[2] += jmap(travelVector.getX() / boxDimension[0], -1.0f, 1.0f, minValue[0], maxValue[0]);
-			mValue[2] += jmap(-travelVector.getY() / boxDimension[1], -1.0f, 1.0f, minValue[1], maxValue[1]);
+			mValue[2] += jmap(travelVector.getX() / mDimension[0], -1.0f, 1.0f, minValue[0], maxValue[0]);
+			mValue[2] += jmap(-travelVector.getY() / mDimension[1], -1.0f, 1.0f, minValue[1], maxValue[1]);
 		}
 		else
 		{
 			
-			mValue[0] += jmap(travelVector.getX() / boxDimension[0], -0.5f, 0.5f, minValue[0], maxValue[0]);
-			mValue[1] += jmap(-travelVector.getY() / boxDimension[1], -0.5f, 0.5f, minValue[1], maxValue[1]);
+			mValue[0] += jmap(travelVector.getX() / mDimension[0], -0.5f, 0.5f, minValue[0], maxValue[0]);
+			mValue[1] += jmap(-travelVector.getY() / mDimension[1], -0.5f, 0.5f, minValue[1], maxValue[1]);
 		}
 		for (int i = 0; i < 3; i++)
 		{
@@ -143,6 +143,34 @@ namespace Gui
 		forceSyncWithSlider();
 		updateView();
 	}
+		void XyzPad::updateView()
+	{
+		float max = -1;
+		int indexOfMax = -1;
+		float ratioForAll = 0;
+		float ratioForZ;
+		if ((mBoxDimension[0] + mBoxDimension[2] * zRatio)/ getWidth() > (mBoxDimension[1] + mBoxDimension[2] * zRatio) / getHeight())
+		{
+			//width is longer
+			ratioForAll = getWidth() / (mBoxDimension[0] + mBoxDimension[2] * zRatio);
+			mDimension[0] = mBoxDimension[0] * ratioForAll;
+			mDimension[1] = mBoxDimension[1] * ratioForAll;
+			mDimension[2] = getWidth() - mDimension[0];
+		}
+		else
+		{
+			//height is longer
+			ratioForAll = getHeight() / (mBoxDimension[1] + mBoxDimension[2] * zRatio);
+			mDimension[0] = mBoxDimension[0] * ratioForAll;
+			mDimension[1] = mBoxDimension[1] * ratioForAll;
+			mDimension[2] = getHeight() - mDimension[1];
+		}
+
+		thumb.setSize(thumbWidth,thumbWidth);
+		Point<int> newThumbPosition = valueToCoordinate(mValue[0], mValue[1], mValue[2]) - Point<int>(thumbWidth / 2, thumbWidth / 2);
+		thumb.setTopLeftPosition(newThumbPosition);
+		repaint();
+	}
 	void XyzPad::paint(Graphics& g)
 	{
 		const auto bounds = getLocalBounds().toFloat();
@@ -150,7 +178,11 @@ namespace Gui
 		//Background
 		g.setColour(mBackgroundColor);
 		g.fillRect(bounds);
-		auto xyBound = Rectangle<float>(0.0f, getYfromBottom(boxDimension[1]), boxDimension[0], boxDimension[1]);
+		
+		auto xyBound = Rectangle<float>(
+			(getWidth()-(mDimension[0] + mDimension[2]))/2, 
+			(getHeight() - (mDimension[1] + mDimension[2])) / 2+ mDimension[2], mDimension[0], mDimension[1]);
+
 		g.setColour(mBorderColor);
 		float dash[2] = { mThickness * 4,mThickness * 4 };
 		Point<float> corner[4] = { xyBound.getBottomLeft(),xyBound.getTopLeft(),xyBound.getTopRight(), xyBound.getBottomRight()};
@@ -158,7 +190,7 @@ namespace Gui
 		std::copy(std::begin(corner), std::end(corner), std::begin(originalCorner));
 		Point<float> strokeOffset(mThickness / 2, -mThickness / 2);
 		//back
-		Point<float> offset = Point<float>(boxDimension[2], -boxDimension[2]);
+		Point<float> offset = Point<float>(mDimension[2], -mDimension[2]);
 		for (int i = 0; i < 4; i++)
 		{
 			corner[i] += offset;
@@ -208,25 +240,18 @@ namespace Gui
 			if (i>0 && i<3)
 				g.drawDashedLine(Line<float> { originalCorner[i], originalCorner[i]+offset }, dash, 2, mThickness);
 		}
-
-
 		g.setColour(mBorderColor);
 
 		g.setColour(mZColor);
-		auto zLine = Line<float>{ originalCorner[0] + strokeOffset, originalCorner[0] + strokeOffset + Point<float>(boxDimension[2] / 3, -boxDimension[2] / 3) };
+		auto zLine = Line<float>{ originalCorner[0] + strokeOffset, originalCorner[0] + strokeOffset + Point<float>(mDimension[2] / 3, -mDimension[2] / 3) };
 		g.drawLine(zLine, mThickness);
 
 		g.setColour(mXColor);
-		auto xLine = Line<float>{ originalCorner[0] + strokeOffset, originalCorner[0] + strokeOffset + Point<float>(boxDimension[0] / 3, 0) };
+		auto xLine = Line<float>{ originalCorner[0] + strokeOffset, originalCorner[0] + strokeOffset + Point<float>(mDimension[0] / 3, 0) };
 		g.drawLine(xLine, mThickness);
 
 		g.setColour(mYColor);
-		auto yLine = Line<float>{ originalCorner[0] + strokeOffset, originalCorner[0] + strokeOffset + Point<float>(0, -boxDimension[1] / 3) };
+		auto yLine = Line<float>{ originalCorner[0] + strokeOffset, originalCorner[0] + strokeOffset + Point<float>(0, -mDimension[1] / 3) };
 		g.drawLine(yLine, mThickness);
-
-
 	}
-
-
-
 }
