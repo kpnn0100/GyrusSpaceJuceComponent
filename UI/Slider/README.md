@@ -1,6 +1,7 @@
 # XyzPad - A Graphical 3D-like XYZ Coordinate Pad
 
 The `XyzPad` is a custom JUCE (Jules' Utility Class Extensions) component that provides a graphical interface for manipulating three values corresponding to the X, Y, and Z axes in a 3D space. It is designed to be used in GUI applications and allows users to interactively manipulate the X, Y, and Z values using a graphical representation of a standard XYZ coordinate system.
+![XyzPad UI](https://raw.githubusercontent.com/kpnn0100/GyrusSpaceJuceComponent/main/Image/XyzPadUI.png)
 
 ## Features
 
