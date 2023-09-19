@@ -9,12 +9,22 @@ namespace Gui
 	XyzPad::XyzPad()
 	{
 		setBoxSize(100, 100, 100);
+		valueChanged();
+	}
+	void XyzPad::updateForSizeChanged()
+	{
+		for (int i = 0; i < 3; i++)
+		{
+			mSource[i] = jmap(mValue[i], minValue[i], maxValue[i], 0.0f, mBoxDimension[i]);
+		}
 	}
 	void XyzPad::setBoxSize(float sizeX, float sizeY, float sizeZ)
 	{
 		mBoxDimension[0] = sizeX;
 		mBoxDimension[1] = sizeY;
 		mBoxDimension[2] = sizeZ;
+		updateForSizeChanged();
+		valueChanged();
 		updateView();
 	}
 	void XyzPad::registerSlider(Slider* slider, int axis)
@@ -42,6 +52,36 @@ namespace Gui
 	{
 		mBackgroundColor = backgroundColor;
 	}
+	void XyzPad::setDestination(float posX, float posY, float posZ)
+	{
+		mDestination[0] = posX;
+		mDestination[1] = posY;
+		mDestination[2] = posZ;
+		for (int i = 0; i < 3; i++)
+		{
+			mDestinationValue[i] = jmap(mDestination[i], 0.0f, mBoxDimension[i], minValue[i], maxValue[i]);
+		}
+		
+		updateView();
+	}
+	float XyzPad::getDestination(int dimension)
+	{
+		return mDestination[dimension];
+	}
+	float XyzPad::getSource(int dimension)
+	{
+		float source = jmap(mValue[dimension], minValue[dimension], maxValue[dimension], 0.0f, mBoxDimension[dimension]);
+		return source;
+	}
+	 void XyzPad::registerSource(XyzPadListener* listener)
+	{
+		mXyzPadListenerList.push_back(listener);
+		listener->sourceValueChanged(Coordinate(mSource[0], mSource[1], mSource[2]));
+	}
+	float XyzPad::getBoxSize(int dimension)
+	{
+		return mBoxDimension[dimension];
+	}
 	void XyzPad::setBorderColor(Colour borderColor)
 	{
 		mBorderColor = borderColor;
@@ -65,8 +105,8 @@ namespace Gui
 				break;
 			}
 		}
-		mValue[whichAxis] = jmap(slider->getValue(), slider->getMinimum(), slider->getMaximum(), (double)minValue[whichAxis], (double)maxValue[whichAxis]);
-		
+		mValue[whichAxis] = slider->getValue();
+		mSource[whichAxis] = jmap(mValue[whichAxis], minValue[whichAxis], maxValue[whichAxis], 0.0f, mBoxDimension[whichAxis]);
 		updateView();
 	}
 	void XyzPad::valueChanged()
@@ -78,6 +118,11 @@ namespace Gui
 				slider->setValue(jmap(mValue[i], minValue[i], maxValue[i], (float)slider->getMinimum(), (float)slider->getMaximum()));
 			}
 		}
+		for (auto* listener : mXyzPadListenerList)
+		{
+			listener->sourceValueChanged(Coordinate(mSource[0], mSource[1], mSource[2]));
+		}
+		updateForSizeChanged();
 		updateView();
 	}
 	void XyzPad::forceSyncWithSlider()
@@ -128,6 +173,7 @@ namespace Gui
 			mValue[i] = std::min(mValue[i], 1.0f);
 			mValue[i] = std::max(mValue[i], -1.0f);
 		}
+
 		valueChanged();
 
 		mDragPositionStart = newPosition;
@@ -141,10 +187,9 @@ namespace Gui
 	void XyzPad::resized()
 	{
 		forceSyncWithSlider();
-		updateView();
 	}
 		void XyzPad::updateView()
-	{
+		{
 		float max = -1;
 		int indexOfMax = -1;
 		float ratioForAll = 0;
@@ -169,6 +214,12 @@ namespace Gui
 		thumb.setSize(thumbWidth,thumbWidth);
 		Point<int> newThumbPosition = valueToCoordinate(mValue[0], mValue[1], mValue[2]) - Point<int>(thumbWidth / 2, thumbWidth / 2);
 		thumb.setTopLeftPosition(newThumbPosition);
+
+		//des thumb
+		mDestinationThumb.setSize(thumbWidth, thumbWidth);
+		newThumbPosition = valueToCoordinate(mDestinationValue[0], mDestinationValue[1], mDestinationValue[2]) - Point<int>(thumbWidth / 2, thumbWidth / 2);
+		mDestinationThumb.setTopLeftPosition(newThumbPosition);
+
 		repaint();
 	}
 	void XyzPad::paint(Graphics& g)
@@ -176,8 +227,8 @@ namespace Gui
 		const auto bounds = getLocalBounds().toFloat();
 
 		//Background
-		g.setColour(mBackgroundColor);
-		g.fillRect(bounds);
+		//g.setColour(mBackgroundColor);
+		//g.fillRect(bounds);
 		
 		auto xyBound = Rectangle<float>(
 			(getWidth()-(mDimension[0] + mDimension[2]))/2, 
@@ -198,9 +249,22 @@ namespace Gui
 		}
 		for (int i = 0; i < 4; i++)
 		{
-			g.drawDashedLine(Line<float> { corner[i], corner[(i + 1) % 4] }, dash, 2, mThickness);
-			if (i ==0 || i ==3)
+			if (i == 2 || i == 1)
+			{
+				g.drawLine(Line<float> { corner[i], corner[(i + 1) % 4] }, mThickness);
+			}
+			else
+			{
+				g.drawDashedLine(Line<float> { corner[i], corner[(i + 1) % 4] }, dash, 2, mThickness);
+			}
+			if (i == 3)
+			{
+				g.drawLine(Line<float> { originalCorner[i], originalCorner[i] + offset }, mThickness);
+			}
+			if (i == 0)
+			{
 				g.drawDashedLine(Line<float> { originalCorner[i], originalCorner[i] + offset }, dash, 2, mThickness);
+			}
 		}
 		//tracking line
 		auto trackingLine = Line<int>(valueToCoordinate(mValue[0], mValue[1], mValue[2]), valueToCoordinate(mValue[0], mValue[1], minValue[2])).toFloat();
@@ -221,12 +285,39 @@ namespace Gui
 
 		trackingLine = Line<int>(valueToCoordinate(mValue[0], mValue[1], mValue[2]), valueToCoordinate(mValue[0], maxValue[1], mValue[2])).toFloat();
 		g.drawLine(trackingLine, mThickness / 2);
-		//Shadow for thumb
-		//thumb
-		g.setColour(Colours::white);
-		auto bound = thumb.getBounds().toFloat();
-		g.fillEllipse(bound);
-		
+		// zColor line
+		g.setColour(mZColor);
+		auto zLine = Line<float>{ originalCorner[0] + strokeOffset, originalCorner[0] + strokeOffset + Point<float>(mDimension[2] / 3, -mDimension[2] / 3) };
+		g.drawLine(zLine, mThickness);
+
+		if (mValue[2] > mDestinationValue[2])
+		{
+
+			//thumb
+			g.setColour(Colours::white);
+			auto bound = thumb.getBounds().toFloat();
+			//g.drawEllipse(bound, mThickness / 2);
+			g.fillEllipse(bound);
+
+			//destination thumb
+			g.setColour(mXColor);
+			auto bound2 = mDestinationThumb.getBounds().toFloat();
+			g.fillEllipse(bound2);
+		}
+		else
+		{
+			//destination thumb
+			g.setColour(mXColor);
+			auto bound2 = mDestinationThumb.getBounds().toFloat();
+			g.fillEllipse(bound2);
+
+			//thumb
+			g.setColour(Colours::white);
+			auto bound = thumb.getBounds().toFloat();
+			//g.drawEllipse(bound, mThickness / 2);
+			g.fillEllipse(bound);
+		}
+
 
 		g.setColour(mBorderColor.brighter(0.1f));
 		//front
@@ -236,16 +327,13 @@ namespace Gui
 		}
 		for (int i = 0; i < 4; i++)
 		{
-			g.drawDashedLine(Line<float> { corner[i], corner[(i + 1) % 4] }, dash, 2, mThickness);
+			g.drawLine(Line<float> { corner[i], corner[(i + 1) % 4] }, mThickness);
 			if (i>0 && i<3)
-				g.drawDashedLine(Line<float> { originalCorner[i], originalCorner[i]+offset }, dash, 2, mThickness);
+				g.drawLine(Line<float> { originalCorner[i], originalCorner[i]+offset }, mThickness);
 		}
 		g.setColour(mBorderColor);
 
-		g.setColour(mZColor);
-		auto zLine = Line<float>{ originalCorner[0] + strokeOffset, originalCorner[0] + strokeOffset + Point<float>(mDimension[2] / 3, -mDimension[2] / 3) };
-		g.drawLine(zLine, mThickness);
-
+		//front color
 		g.setColour(mXColor);
 		auto xLine = Line<float>{ originalCorner[0] + strokeOffset, originalCorner[0] + strokeOffset + Point<float>(mDimension[0] / 3, 0) };
 		g.drawLine(xLine, mThickness);

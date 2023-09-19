@@ -57,9 +57,15 @@
  * @see Gui::XyzPad::getValue
  * */
 #include <JuceHeader.h>
+#include <util/Util.h>
 using namespace juce;
 namespace Gui
 {	
+	class XyzPadListener
+	{
+	public:
+		virtual void sourceValueChanged(Coordinate source) = 0;
+	};
 	class XyzPad : public Component, Slider::Listener
 	{
 		class Thumb : public Component
@@ -69,7 +75,11 @@ namespace Gui
 		private:
 		};
 	private:
-		float mValue[3] = {0.0f,0.0f,0.0f};
+		std::vector<XyzPadListener*> mXyzPadListenerList;
+		float mValue[3] = {0.5f,0.5f,0.8f};
+		float mSource[3] = { 0.0f,0.0f,0.0f };
+		float mDestination[3] = { 0.0f,0.0f,0.0f };
+		float mDestinationValue[3] = { 0.0f,0.0f,0.0f };
 		float minValue[3] = {-1.0f, -1.0f, -1.0f};
 		float maxValue[3] = { 1.0f, 1.0f, 1.0f };
 		float mDimension[3];
@@ -84,12 +94,13 @@ namespace Gui
 		Point<float> mDragPositionStart;
 		static constexpr int thumbWidth = 20;
 		Thumb thumb;
+		Thumb mDestinationThumb;
 		//juce method
 		Point<int> valueToCoordinate(float x, float y, float z);
 
 		void mouseDown(const MouseEvent& event) override;
 		void mouseDrag(const MouseEvent& event) override;
-
+		void updateForSizeChanged();
 		float getYfromBottom(float y);
 		void resized() override;
 		void paint(Graphics& g) override;
@@ -101,10 +112,15 @@ namespace Gui
 		std::mutex mutex;
 	public:
 		XyzPad();
+		void registerSource(XyzPadListener* listener);
 		void setBoxSize(float sizeX, float sizeY, float sizeZ);
 		void registerSlider(Slider* slider, int axis);
 		void deregisterSlider(Slider* slider);
+		void setDestination(float posX, float posY, float posZ);
+		float getDestination(int dimension);
+		float getSource(int dimension);
 		float getValue(int dimension);
+		float getBoxSize(int dimension);
 		void setBackgroundColor(Colour backgroundColor);
 		void setBorderColor(Colour borderColor);
 		void setAxisColor(Colour x, Colour y, Colour z);
