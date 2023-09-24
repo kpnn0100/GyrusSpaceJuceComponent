@@ -66,7 +66,7 @@ namespace Gui
 	public:
 		virtual void sourceValueChanged(Coordinate source) = 0;
 	};
-	class XyzPad : public Component, Slider::Listener
+	class XyzPad : public Component, public Slider::Listener, public SettableTooltipClient
 	{
 		class Thumb : public Component
 		{

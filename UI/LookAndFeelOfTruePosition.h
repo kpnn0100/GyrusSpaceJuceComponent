@@ -28,6 +28,9 @@ public:
         const Slider::SliderStyle,
         Slider&
     ) override;
+    void drawRotarySlider(Graphics&, int x, int y, int width, int height,
+        float sliderPosProportional, float rotaryStartAngle,
+        float rotaryEndAngle, Slider&) override;
     Label* createSliderTextBox(Slider& slider) override;
 };
 
